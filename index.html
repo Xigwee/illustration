@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>二次元插画 · 段位评定</title>
+<style>
+:root {
+  --bg: #060a10; --panel: #0a121a; --border: #1a2c3a;
+  --text: #b9cddb; --dim: #5a7a8a; --accent: #7cd8ff;
+  --success: #4be0c0; --warning: #e0a63c; --danger: #f87171;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 13px; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+}
+
+/* ═══ 顶栏 ═══ */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; height: 60px;
+  background: linear-gradient(180deg, #0d1822, #080d14);
+  border-bottom: 1px solid var(--border); z-index: 10;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.header-title {
+  font-size: 16px; letter-spacing: 3px; color: #dfeef8;
+  text-shadow: 0 0 10px rgba(90, 200, 255, 0.4);
+}
+.header-title span { font-size: 10px; color: #4a7a9a; letter-spacing: 1px; border-left: 1px solid var(--border); padding-left: 12px; }
+
+/* 作者与制作信息 */
+.author-info { display: flex; align-items: center; gap: 10px; font-size: 11px; margin-left: 10px; }
+.author-link {
+  color: #f472b6; text-decoration: none; display: flex; align-items: center; gap: 4px;
+  background: rgba(244, 114, 182, 0.1); padding: 4px 10px; border-radius: 12px;
+  border: 1px solid rgba(244, 114, 182, 0.3); transition: 0.2s;
+}
+.author-link:hover { background: rgba(244, 114, 182, 0.2); box-shadow: 0 0 10px rgba(244,114,182,0.3); }
+.ai-tag { color: var(--dim); font-style: italic; }
+
+/* 全局综合段位显示 */
+.rank-display {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(224, 166, 60, 0.1); border: 1px solid rgba(224, 166, 60, 0.4);
+  padding: 4px 16px; border-radius: 20px; cursor: pointer; transition: 0.2s;
+}
+.rank-display:hover { background: rgba(224, 166, 60, 0.2); box-shadow: 0 0 15px rgba(224,166,60,0.2); }
+.rank-display .r-icon { font-size: 16px; }
+.rank-display .r-text { font-size: 14px; font-weight: bold; color: var(--warning); letter-spacing: 1px; }
+
+.actions button {
+  background: rgba(20, 45, 65, 0.6); border: 1px solid #2a4c64; color: #8fc8e6;
+  padding: 8px 16px; font-size: 12px; cursor: pointer; transition: 0.2s;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  margin-left: 10px;
+}
+.actions button:hover { background: rgba(30, 70, 100, 0.8); color: #dff5ff; border-color: #4a9cc4; }
+.actions button.primary { background: linear-gradient(90deg, #1f6485, #3898c4); color: #fff; border: none; }
+.actions button.primary:hover { filter: brightness(1.2); }
+
+/* ═══ 主布局 ═══ */
+.main { display: flex; flex: 1; min-height: 0; }
+
+/* 左侧导航 */
+.sidebar {
+  width: 84px; background: var(--panel); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; padding-top: 12px; z-index: 5;
+}
+.nav-item {
+  width: 64px; height: 72px; margin-bottom: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; cursor: pointer; border: 1px solid transparent;
+  transition: 0.2s; color: var(--dim); border-radius: 2px;
+}
+.nav-item:hover { background: #122030; color: #9fc0d0; }
+.nav-item.active { background: #14283a; border-color: #2a5c8a; color: var(--accent); box-shadow: inset 0 0 10px rgba(40, 120, 200, 0.2); }
+.nav-icon { font-size: 24px; margin-bottom: 4px; }
+.nav-name { font-size: 11px; letter-spacing: 1px; }
+
+/* 树区域 */
+.tree-wrapper {
+  flex: 1; overflow: auto; position: relative;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(20, 40, 60, 0.4), transparent 80%),
+    linear-gradient(rgba(40, 80, 120, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(40, 80, 120, 0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+}
+.tree-container { position: relative; width: 1100px; height: 1750px; margin: 30px; }
+svg.links { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+svg.links path { fill: none; stroke-width: 2; transition: stroke 0.3s; }
+svg.links path.locked { stroke: #1a2c3a; }
+svg.links path.open { stroke: #4a7a9a; stroke-dasharray: 4 4; }
+svg.links path.active { stroke: var(--success); filter: drop-shadow(0 0 4px rgba(75, 224, 192, 0.5)); }
+
+/* 节点 */
+.node {
+  position: absolute; width: 130px; height: 56px; background: #0d1822; border: 1px solid #1e3a4c;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: all 0.2s; user-select: none; z-index: 2; padding: 0 8px;
+}
+.node::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #1e3a4c; transition: background 0.3s; }
+.node.locked { opacity: 0.4; filter: grayscale(1); }
+.node.available { border-color: var(--warning); animation: pulse 2s infinite; }
+.node.available::before { background: var(--warning); }
+.node.unlocked { border-color: var(--success); background: #0f1e24; box-shadow: 0 0 15px rgba(75, 224, 192, 0.15); }
+.node.unlocked::before { background: var(--success); }
+.node.selected { box-shadow: 0 0 20px rgba(120, 200, 255, 0.6); border-color: var(--accent) !important; z-index: 3; }
+.node:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); }
+.node-name { font-size: 11px; color: #c0d8e8; text-align: center; line-height: 1.3; font-weight: bold; }
+.node-rank { font-size: 9px; color: #5a8a9a; margin-top: 2px; }
+.node.unlocked .node-rank { color: var(--success); }
+.node.available .node-rank { color: var(--warning); }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 5px rgba(224, 166, 60, 0.2); } 50% { box-shadow: 0 0 15px rgba(224, 166, 60, 0.6); } }
+
+/* 右侧详情 */
+.detail {
+  width: 340px; background: var(--panel); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; z-index: 5;
+}
+.detail-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.detail-header h2 { font-size: 15px; color: #dfeef8; font-weight: normal; }
+.detail-content { flex: 1; overflow-y: auto; padding: 20px; }
+.info-group { margin-bottom: 20px; }
+.info-label { font-size: 11px; color: #4a7a9a; letter-spacing: 1px; margin-bottom: 8px; border-bottom: 1px dashed #1a2c3a; padding-bottom: 4px; }
+.info-value { font-size: 13px; color: #b0c8d8; line-height: 1.6; }
+.explain-box { background: rgba(30, 60, 85, 0.2); padding: 10px; border-left: 2px solid var(--accent); border-radius: 0 4px 4px 0; font-style: italic; color: #a8c0d0; font-size: 12.5px; line-height: 1.7; }
+.rank-badge { display: inline-block; font-size: 18px; color: var(--warning); font-weight: bold; margin-bottom: 10px; text-shadow: 0 0 10px rgba(224,166,60,0.3); }
+.rank-badge.unlocked { color: var(--success); text-shadow: 0 0 10px rgba(75,224,192,0.3); }
+
+/* 分支总览列表 */
+.b-list { margin-top: 10px; }
+.b-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(20, 40, 60, 0.3); border: 1px solid #1a2c3a; margin-bottom: 6px; border-radius: 2px; cursor: pointer; transition: 0.2s; }
+.b-item:hover { background: rgba(40, 70, 100, 0.5); border-color: #2a5c8a; }
+.b-item.unlocked { border-left: 2px solid var(--success); }
+.b-item.locked { opacity: 0.6; }
+.b-item-name { font-size: 12px; color: #c0d8e8; }
+.b-item-rank { font-size: 11px; color: var(--dim); }
+.b-item.unlocked .b-item-rank { color: var(--success); }
+
+/* 全局段位面板 */
+.overall-panel {
+  background: linear-gradient(180deg, rgba(30, 40, 50, 0.4), rgba(10, 18, 26, 0.8));
+  border: 1px solid #2a4c64; border-radius: 4px; padding: 16px; margin-bottom: 20px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+.overall-title { font-size: 12px; color: var(--warning); letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
+.overall-rank { font-size: 26px; color: #fff; font-weight: bold; text-align: center; margin-bottom: 12px; text-shadow: 0 0 15px rgba(255,255,255,0.2); }
+.overall-comment { font-size: 13px; color: #b0c8d8; line-height: 1.8; text-align: justify; }
+.overall-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.o-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(75, 224, 192, 0.1); border: 1px solid var(--success); color: var(--success); }
+.o-tag.warn { background: rgba(248, 113, 113, 0.1); border-color: var(--danger); color: var(--danger); }
+
+/* 升段条件框 */
+.next-goal-box { background: rgba(40, 80, 120, 0.15); border: 1px dashed #2a5c8a; padding: 12px; border-radius: 4px; margin-bottom: 20px; }
+.next-goal-box.beyond { border-color: var(--warning); background: rgba(224, 166, 60, 0.1); }
+.goal-title { font-size: 12px; color: var(--accent); margin-bottom: 6px; }
+.next-goal-box.beyond .goal-title { color: var(--warning); }
+.goal-desc { font-size: 12px; color: #a8c0d0; line-height: 1.6; }
+
+.btn { width: 100%; padding: 12px; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin-top: 10px; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); transition: 0.2s; }
+.btn-primary { background: linear-gradient(90deg, #1f6485, #3898c4); border: none; color: #fff; }
+.btn-primary:hover { filter: brightness(1.2); }
+.btn-primary:disabled { background: #1a2c3a; color: #4a6a7a; cursor: not-allowed; filter: none; }
+.btn-outline { background: transparent; border: 1px solid #2a5c8a; color: var(--accent); }
+.btn-outline:hover { background: rgba(42, 92, 138, 0.2); border-color: #4a9cc4; }
+.disclaimer-text { font-size: 11px; color: #4a6a7a; line-height: 1.5; margin-top: 15px; text-align: center; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: #1e3a4c; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <div class="header-title">
+      二次元插画 · 科技树
+      <span>娱乐向评定 v1</span>
+    </div>
+    <div class="author-info">
+      <a href="https://space.bilibili.com/2018318845" target="_blank" class="author-link">B站 且补天裂</a>
+      <span class="ai-tag">技术支持：DeepSeek</span>
+    </div>
+    <div class="rank-display" id="headerRank" onclick="showOverall()">
+      <div class="r-icon">🌱</div>
+      <div class="r-text" id="headerRankText">未入门</div>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="resetBtn">清空进度</button>
+    <button id="exportBtn" class="primary">导出全景评级图</button>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="sidebar" id="sidebar"></aside>
+  
+  <div class="tree-wrapper" id="treeWrapper">
+    <div class="tree-container" id="treeContainer">
+      <svg class="links" id="svg"></svg>
+      <div id="nodesLayer"></div>
+    </div>
+  </div>
+
+  <aside class="detail">
+    <div class="detail-header">
+      <h2 id="detailTitle">综合评定档案</h2>
+    </div>
+    <div class="detail-content" id="detailContent"></div>
+  </aside>
+</div>
+
+<script>
+/* ═══════════ 基础配置 ═══════════ */
+const BRANCHES = {
+  T: { name: '基础系统', icon: '📐', color: '#38bdf8' },
+  H: { name: '头面系统', icon: '👤', color: '#22d3ee' },
+  B: { name: '躯干系统', icon: '👕', color: '#60a5fa' },
+  L: { name: '四肢系统', icon: '🦵', color: '#c084fc' },
+  G: { name: '场景系统', icon: '🏙️', color: '#fb7185' },
+  S: { name: '色彩系统', icon: '🎨', color: '#facc15' },
+  I: { name: '整合系统', icon: '🖼️', color: '#34d399' }
+};
+const TIER_LABEL = { 1: '一代', 2: '二代', 3: '三代', 4: '四代' };
+const NW = 130, NH = 56;
+
+/* ═══════════ 打磨后的段位标准 ═══════════ */
+const RANKS = [
+  { level: '未入门', title: '未入门 · 观光客', icon: '👀', color: '#4a6a7a',
+    desc: '当前尚未点亮任何基础节点。可能你还在观望，或者只是单纯点进来看看大肥鱼搞了什么花活。建议从【基础系统】的线条与透视开始探索。',
+    tag_ok: ['零基础'], tag_warn: ['还没开始'],
+    criteria: '点亮基础系统(T)的任意一个节点。',
+    check: () => unlocked.size > 0 },
+
+  { level: '一段', title: '一段 · 萌新画手', icon: '🌱', color: '#94a3b8',
+    desc: '【次元入门期】刚接触板绘或二次元临摹。线条抖动、闭塞线未处理，人体像“火柴人”，透视完全凭直觉。上色多为纯色平铺，体积感不足。需立刻建立正确的观察与线条发力习惯。',
+    tag_ok: ['热爱二次元'], tag_warn: ['线稿碎', '人体崩坏'],
+    criteria: '点亮基础系统(T)的所有一代节点。', 
+    check: () => unlocked.has('T1') && unlocked.has('T2') && unlocked.has('T3') },
+    
+  { level: '二段', title: '二段 · 形体画手', icon: '📐', color: '#38bdf8',
+    desc: '【结构觉醒期】能画出完整的二次元头像，但身体比例失调（如大头小身、面条手），头发像一块铁板。明白了赛璐璐的概念，但明暗交界线画得像狗啃。临摹神仙图尚可，一原创就崩。',
+    tag_ok: ['线条流畅'], tag_warn: ['纸片人', '比例失调'],
+    criteria: '点亮头面、躯干、四肢分支的基础体块节点（H1、B1、L1）。',
+    check: () => unlocked.has('H1') && unlocked.has('B1') && unlocked.has('L1') },
+
+  { level: '三段', title: '三段 · 技法画手', icon: '🧱', color: '#60a5fa',
+    desc: '【线稿修行期】线稿有了粗细变化，能画出干净的赛璐璐平涂。拥有构图意识，会加些二次元常见的小装饰（如星星、飘带）。但人物动态生硬，不懂找参考，缺乏对二次元夸张结构的底层理解。',
+    tag_ok: ['干净的平涂'], tag_warn: ['动态僵硬', '依赖临摹'],
+    criteria: '点亮“动态线动作(L8)”或“五官落位(H3)”，掌握基础的二次元变体。',
+    check: () => unlocked.has('L8') || unlocked.has('H3') },
+
+  { level: '四段', title: '四段 · 破局画手', icon: '💡', color: '#a78bfa',
+    desc: '【瓶颈突破期】能画出完成度极高的二次元立绘，发丝分组、褶皱走向都有模有样，伪厚涂/赛璐璐切换自如。但画复杂透视（如俯仰、大透视手部）容易崩，画风不统一。达到此段，已具备接普通商单或做游戏原画外包的能力。',
+    tag_ok: ['高完成度', '材质区分'], tag_warn: ['透视易崩', '画风摇摆'],
+    criteria: '点亮任意一个三代核心结构（如H12头部透视、B9厚衣体积、L9手脚透视），且色彩达到二代。',
+    check: () => (unlocked.has('H12') || unlocked.has('B9') || unlocked.has('L9')) && unlocked.has('S5') },
+
+  { level: '五段', title: '五段 · 职业画师', icon: '🛡️', color: '#fbbf24',
+    desc: '【专业独立期】圈子里的“太太”。画风稳定，商单不断，能完美驾驭各种二次元萌点（机甲、兽耳、异世界）。此时画技已非最大壁垒，核心在于建立个人IP与不可替代的风格。许多人会转岗主美、导演，强项变为“审美把控”与“项目管理”。',
+    tag_ok: ['独当一面', '接单自由'], tag_warn: ['需塑品牌'],
+    criteria: '打通整合系统，解锁“全身插画(I4)”或“商单工业化(I6)”，且色彩、背景系统均达到三代。',
+    check: () => (unlocked.has('I4') || unlocked.has('I6')) && unlocked.has('S7') && unlocked.has('G8') },
+
+  { level: '六段', title: '六段 · 顶流画师', icon: '👑', color: '#f59e0b',
+    desc: '【个人品牌期】科技树的终点。画风即是金字招牌，发张草图都能上万赞，独立画集销量惊人。技法上已无死角，剩下的路，是建立极强的“表达力”、跨领域的常识积累，以及对整个二次元圈层审美的引领。',
+    tag_ok: ['自带流量', '一稿难求'], tag_warn: ['需扩常识'],
+    criteria: '点亮全树 100% 节点（点满所有科技）。',
+    check: () => unlocked.size === NODES.length },
+
+  { level: '七段', title: '七段 · 宗师', icon: '🔥', color: '#f87171', isBeyond: true,
+    desc: '【业界标杆】不仅是你个人的胜利，更是对二次元行业有深远影响的人物。可能是某款现象级二次元游戏的美术主美，或是某种新风潮（如“厚涂风”或“设计流”）的开创者。你的名字在圈内就是品质保证。',
+    tag_ok: ['行业顶端'], tag_warn: ['跨越时代'],
+    criteria: '此为隐藏境界。需在现实中拥有极强的业界口碑与稳定高净值受众。',
+    check: () => false },
+
+  { level: '八段', title: '八段 · 殿堂传奇', icon: '🌟', color: '#fff', isBeyond: true,
+    desc: '【时代印记】在二次元艺术史上留下浓墨重彩的一笔。定义了一种审美范式，其作品被无数后来者顶礼膜拜与模仿。这已无关技法，而是天赋、机遇与时代共振的结果。',
+    tag_ok: ['封神'], tag_warn: ['不可复制'],
+    criteria: '此为隐藏境界。超越科技树，属于历史成就。',
+    check: () => false }
+];
+
+/* ═══════════ 66 个节点数据（略，保持你之前的原样即可） ═══════════ */
+const NODES = [
+  { id:'T1', b:'T', tier:1, name:'观察与测量', x:40, y:800, rank:'一代·入门', prereq:[], content:'目测比例 · 笔杆测量 · 正负形观察', explain:'先看大形再看细节，是避免画崩的根本习惯。用铅笔竖在眼前比对比例，或用负形检查轮廓。', output:'能临摹简单静物，比例误差小' },
+  { id:'T2', b:'T', tier:1, name:'线条控制', x:40, y:875, rank:'一代·入门', prereq:[], content:'长线练习 · 轻重变化 · 收笔接线', explain:'二次元插画高度依赖线稿。练习从肩部发力画长线，而不是用手腕蹭短线。线条要有粗细变化。', output:'能一笔画出流畅长曲线' },
+  { id:'T3', b:'T', tier:1, name:'几何透视', x:40, y:950, rank:'一代·入门', prereq:[], content:'方体圆柱球体 · 一点两点透视', explain:'一切复杂形体都可还原为几何体。掌握方体在透视中的变化，是后续所有结构的地基。', output:'任意角度方体组合' },
+  
+  { id:'H1', b:'H', tier:1, name:'头骨简化体块', x:220, y:40, rank:'一代·入门', prereq:['T2','T3'], content:'颅骨球体 · 面颅方体 · 下颌楔形', explain:'二次元头部先理解为球+方+楔的三块组合。下颌决定脸型宽窄与下巴角度。', output:'任意角度头部体块组合' },
+  { id:'H2', b:'H', tier:1, name:'十字辅助线', x:220, y:115, rank:'一代·入门', prereq:['T1','H1'], content:'正中线 · 眼线 · 眉线 · 鼻底', explain:'十字线是头部定位的坐标系。透视中两条线会弯曲，弯曲方向就是头部朝向。', output:'快速定位多角度头部五官' },
+  { id:'H3', b:'H', tier:1, name:'五官落位', x:220, y:190, rank:'一代·进阶', prereq:['H2'], content:'三庭五眼 · 二次元变体', explain:'二次元会压缩中庭、放大眼睛。理解标准比例后再做变体。', output:'准确放置五官' },
+  { id:'H4', b:'H', tier:1, name:'眼睛结构', x:220, y:265, rank:'一代·进阶', prereq:['H3'], content:'眼球球体 · 上下眼睑 · 瞳孔', explain:'眼睛嵌在眼窝里的球体。上眼睑比下眼睑厚，覆盖眼球更多。', output:'不同角度眼睛的立体结构' },
+  { id:'H5', b:'H', tier:1, name:'鼻嘴结构', x:220, y:340, rank:'一代·进阶', prereq:['H3'], content:'鼻骨鼻头 · 口轮匝肌 · 唇线', explain:'鼻子是面部最凸的结构，决定侧脸轮廓。嘴部要注意口轮匝肌的圆柱感。', output:'正侧半侧鼻嘴结构' },
+  { id:'H6', b:'H', tier:1, name:'脸型轮廓', x:220, y:415, rank:'一代·进阶', prereq:['H3'], content:'颧骨 · 下颌角 · 下巴弧度', explain:'脸型由骨骼决定。轮廓线要顺，从颧骨到下颌到下巴一气呵成。', output:'三种以上脸型' },
+  { id:'H7', b:'H', tier:1, name:'耳部结构', x:220, y:490, rank:'一代·进阶', prereq:['H2'], content:'耳轮 · 对耳轮 · 耳垂', explain:'耳朵位于眼线到鼻底之间，略微后倾。外轮廓与位置必须对。', output:'正侧半侧耳朵位置正确' },
+  { id:'H8', b:'H', tier:2, name:'头部多角度', x:390, y:40, rank:'二代·入门', prereq:['H4','H5','H6'], content:'正/侧/半侧/四分之三/背', explain:'多角度是同一个头在转。四分之三侧最常用，要能凭记忆画出。', output:'多角度特征保持一致' },
+  { id:'H9', b:'H', tier:2, name:'五官风格化', x:390, y:115, rank:'二代·入门', prereq:['H4','H5'], content:'眼型分类 · 鼻口简化', explain:'风格化是有意识的省略。先决定保留什么、省略什么，再落笔。', output:'有辨识度的五官风格' },
+  { id:'H10', b:'H', tier:2, name:'发束分组', x:390, y:190, rank:'二代·入门', prereq:['H6','H7'], content:'刘海/侧发/后发 · 发际线', explain:'头发分成片和束。每束头发都有起点和终点。', output:'头发有分组、有体积' },
+  { id:'H11', b:'H', tier:2, name:'发丝走向', x:390, y:265, rank:'二代·进阶', prereq:['H10'], content:'发旋 · 发流方向 · 发梢分叉', explain:'头发从发旋向外辐射生长，受重力影响。发梢要尖锐或外翻。', output:'头发走向自然' },
+  { id:'H12', b:'H', tier:3, name:'头部俯仰透视', x:560, y:40, rank:'三代·入门', prereq:['H8'], content:'俯视头部 · 仰视头部', explain:'俯视时头顶面积增大；仰视时下颌底面可见。大透视头部常用于冲击力画面。', output:'俯仰30度以上结构不崩' },
+  { id:'H13', b:'H', tier:3, name:'基础表情', x:560, y:115, rank:'三代·入门', prereq:['H9'], content:'喜怒哀惊 · 眉眼口联动', explain:'表情是五官的联动。先定情绪强度，再决定变化幅度。', output:'四种基础表情' },
+  { id:'H14', b:'H', tier:3, name:'表情演技与光影', x:730, y:75, rank:'三代·精通', prereq:['H12','H13'], content:'复杂情绪 · 头发高光 · 皮肤明暗', explain:'高级表情是复合情绪，关键在于矛盾。头部光影要抓住头发环状高光。', output:'头部完成度高' },
+
+  { id:'B1', b:'B', tier:1, name:'胸腔骨盆', x:220, y:600, rank:'一代·入门', prereq:['T3'], content:'胸腔几何 · 骨盆几何 · 腰线', explain:'胸腔是蛋形，骨盆是碗形。画躯干先定这两个体块的朝向。', output:'躯干体块转角度' },
+  { id:'B2', b:'B', tier:1, name:'脊柱曲线', x:220, y:675, rank:'一代·入门', prereq:['B1'], content:'颈椎 · 胸椎 · 腰椎 · S形', explain:'脊柱是躯干的中轴。从侧面看呈S形，动态中决定身体姿态。', output:'自然的脊柱曲线' },
+  { id:'B3', b:'B', tier:1, name:'肩线胯线', x:220, y:750, rank:'一代·进阶', prereq:['B1','T1'], content:'锁骨 · 肩峰 · 骨盆倾斜', explain:'走路时肩胯反向扭转。二次元常夸张肩窄胯宽。', output:'肩胯关系正确' },
+  { id:'B4', b:'B', tier:1, name:'头身比重心', x:220, y:825, rank:'一代·进阶', prereq:['B3'], content:'头身比 · 重心垂线', explain:'重心垂线必须落在支撑面内，否则人物会显得飘。', output:'站姿稳定不飘' },
+  { id:'B5', b:'B', tier:2, name:'体型风格化', x:390, y:600, rank:'二代·入门', prereq:['B4'], content:'体型分类 · 剪影辨识度', explain:'体型是角色的第一识别。先画剪影。', output:'有辨识度体型' },
+  { id:'B6', b:'B', tier:2, name:'服装贴合', x:390, y:675, rank:'二代·入门', prereq:['B4'], content:'包裹体 · 松紧关系 · 领口袖口', explain:'服装是穿在体块上的。要画出松量。', output:'服装贴合身体' },
+  { id:'B7', b:'B', tier:2, name:'褶皱受力', x:390, y:750, rank:'二代·进阶', prereq:['B6'], content:'拉伸 · 堆积 · 垂坠褶皱', explain:'褶皱从受力点产生。拉伸是直线，堆积是Z字形，垂坠是弧线。', output:'褶皱有受力逻辑' },
+  { id:'B8', b:'B', tier:2, name:'衣摆走向', x:390, y:825, rank:'二代·进阶', prereq:['B7'], content:'衣摆摆动 · 重力堆积', explain:'静止时向下堆积，走动时向后飘。', output:'衣摆走向自然' },
+  { id:'B9', b:'B', tier:3, name:'厚衣体积', x:560, y:600, rank:'三代·入门', prereq:['B8'], content:'外套 · 斗篷 · 体积感', explain:'厚衣服让轮廓外扩。先画人体，再罩上衣服。', output:'厚衣有体积' },
+  { id:'B10', b:'B', tier:3, name:'躯干扭转', x:560, y:675, rank:'三代·入门', prereq:['B5','B9'], content:'脊柱扭转 · 透视压缩', explain:'胸腔和骨盆朝向不同。透视中要注意近大远小。', output:'扭转动态成立' },
+  { id:'B11', b:'B', tier:3, name:'布料材质', x:730, y:675, rank:'三代·精通', prereq:['B9'], content:'棉/丝/皮革 · 垂坠感', explain:'丝绸反光强，皮革反光硬，棉布反光弱。', output:'材质质感分明' },
+
+  { id:'L1', b:'L', tier:1, name:'关节骨骼', x:220, y:950, rank:'一代·入门', prereq:['T2','T3'], content:'肩肘腕 · 髋膝踝 · 关节朝向', explain:'关节是四肢的铰链，不能反折——肘向后弯、膝向前弯。', output:'四肢关节不反折' },
+  { id:'L2', b:'L', tier:1, name:'简化肌肉', x:220, y:1025, rank:'一代·入门', prereq:['L1'], content:'三角肌 · 肱二头肌 · 小腿', explain:'肌肉起伏决定四肢轮廓。要知道底层结构，但画时简化。', output:'四肢轮廓有起伏' },
+  { id:'L3', b:'L', tier:1, name:'手臂比例', x:220, y:1100, rank:'一代·进阶', prereq:['L2'], content:'上臂/前臂/手 · 肘位置', explain:'上臂与前臂比例约一比一，手长约为脸长。', output:'手臂比例正确' },
+  { id:'L4', b:'L', tier:1, name:'腿部比例', x:220, y:1175, rank:'一代·进阶', prereq:['L2'], content:'大腿/小腿/足 · 膝盖位置', explain:'大腿略长于小腿。二次元常拉长腿部比例。', output:'腿部比例正确' },
+  { id:'L5', b:'L', tier:2, name:'手部体块', x:390, y:950, rank:'二代·入门', prereq:['L3'], content:'手掌方体 · 指根弧线', explain:'手掌是楔形方体。手背是凸面，手心是凹面。', output:'手部体块正确' },
+  { id:'L6', b:'L', tier:2, name:'手指分节', x:390, y:1025, rank:'二代·入门', prereq:['L5'], content:'指骨三节 · 拇指对掌', explain:'手指关节弯曲时会鼓出来。中指最长，小指最短。', output:'手指分节清晰' },
+  { id:'L7', b:'L', tier:2, name:'足部结构', x:390, y:1100, rank:'二代·入门', prereq:['L4'], content:'足弓 · 脚趾分组 · 鞋子包裹', explain:'脚是楔形，脚踝在脚跟前方。', output:'脚踩实地面' },
+  { id:'L8', b:'L', tier:2, name:'动态线动作', x:390, y:1175, rank:'二代·进阶', prereq:['L3','L4'], content:'走/跑/跳 · 重心转移', explain:'动态线是贯穿全身的曲线。跑步时身体前倾、手臂摆动。', output:'动作自然舒展' },
+  { id:'L9', b:'L', tier:3, name:'手脚透视', x:560, y:950, rank:'三代·入门', prereq:['L6','L7'], content:'手部透视缩短 · 脚部俯仰', explain:'朝镜头伸出的手会发生透视缩短。要用盒子先框住。', output:'透视中结构正确' },
+  { id:'L10', b:'L', tier:3, name:'交互与握持', x:560, y:1025, rank:'三代·入门', prereq:['L6'], content:'握剑/枪/杯 · 手指包覆', explain:'握持的关键是手指包覆道具的圆柱，拇指决定握持可信度。', output:'手与道具关系正确' },
+  { id:'L11', b:'L', tier:3, name:'复杂动作张力', x:560, y:1100, rank:'三代·进阶', prereq:['L8','L9'], content:'大幅度动作 · 夸张变形', explain:'强化动态线的弧度、拉长四肢末端能提升张力。', output:'动作剪影可读' },
+  { id:'L12', b:'L', tier:3, name:'动作透视缩短', x:730, y:1025, rank:'三代·精通', prereq:['L11'], content:'大透视动作 · 近大远小', explain:'镜头放近，手脚朝观众冲出。前提是透视缩短画准。', output:'大透视有冲击力' },
+
+  { id:'G1', b:'G', tier:1, name:'一点两点透视', x:220, y:1300, rank:'一代·入门', prereq:['T3'], content:'地平线 · 消失点', explain:'一点透视用于正面，两点透视用于斜角。', output:'正确的一点两点透视' },
+  { id:'G2', b:'G', tier:1, name:'地平线与视高', x:220, y:1375, rank:'一代·入门', prereq:['G1'], content:'视平线 · 俯视仰视', explain:'视高降低，角色显高大；视高升高，场景显开阔。', output:'通过视高改变情绪' },
+  { id:'G3', b:'G', tier:1, name:'角色与地面', x:220, y:1450, rank:'一代·进阶', prereq:['G2'], content:'落脚点 · 投影 · 空间占位', explain:'角色必须有明确的落脚点和投影，否则会显得漂浮。', output:'角色稳稳站定' },
+  { id:'G4', b:'G', tier:2, name:'三点透视', x:390, y:1300, rank:'二代·入门', prereq:['G2'], content:'第三个消失点 · 强俯仰', explain:'多一个垂直消失点，表现高楼等强纵深场景。', output:'三点透视建筑' },
+  { id:'G5', b:'G', tier:2, name:'简单建筑', x:390, y:1375, rank:'二代·入门', prereq:['G4'], content:'墙体门窗 · 结构分组', explain:'建筑要先分组。门窗要按透视排列。', output:'合理的简单建筑' },
+  { id:'G6', b:'G', tier:2, name:'道具与尺度', x:390, y:1450, rank:'二代·进阶', prereq:['G5'], content:'家具植被 · 人体参照', explain:'道具提供尺度参照。尺度要和人体比例对应。', output:'尺度协调' },
+  { id:'G7', b:'G', tier:2, name:'前后遮挡', x:390, y:1525, rank:'二代·进阶', prereq:['G6'], content:'前景中景远景 · 轮廓分离', explain:'画面要有三个层次。靠遮挡和大小变化制造纵深。', output:'明确的层次' },
+  { id:'G8', b:'G', tier:3, name:'光影与天气', x:560, y:1300, rank:'三代·入门', prereq:['G7'], content:'光源方向 · 雨雪雾', explain:'背景光影要和角色统一。天气是氛围快捷键。', output:'氛围成立' },
+  { id:'G9', b:'G', tier:3, name:'空气透视', x:560, y:1375, rank:'三代·入门', prereq:['G8'], content:'大气衰减 · 雾化处理', explain:'越远的物体对比度越低、色彩越接近环境色。', output:'远景自然退远' },
+  { id:'G10', b:'G', tier:3, name:'镜头与叙事', x:730, y:1375, rank:'三代·精通', prereq:['G7'], content:'焦段选择 · 视觉引导', explain:'广角强调纵深，长焦压缩空间。背景任务是讲故事。', output:'背景讲故事' },
+
+  { id:'S1', b:'S', tier:1, name:'明暗三大面', x:220, y:1620, rank:'一代·入门', prereq:['T3'], content:'亮面/灰面/暗面 · 五大调', explain:'先确定光源方向，再分亮灰暗。不要一上来就抠细节。', output:'体积成立' },
+  { id:'S2', b:'S', tier:1, name:'投影与反光', x:220, y:1695, rank:'一代·入门', prereq:['S1'], content:'投影形状 · 接触阴影', explain:'接触点最暗。反光不能比亮部亮。', output:'明暗完整' },
+  { id:'S3', b:'S', tier:1, name:'色彩基础', x:220, y:1770, rank:'一代·进阶', prereq:['S1'], content:'色相明度 · 冷暖 · 色轮', explain:'新手最常见的问题是只改色相不改明度。', output:'掌握色彩三要素' },
+  { id:'S4', b:'S', tier:2, name:'色调关系', x:390, y:1620, rank:'二代·入门', prereq:['S3'], content:'主色辅色 · 冷暖对比', explain:'主色占七成、辅色两成、点缀一成。', output:'配色协调' },
+  { id:'S5', b:'S', tier:2, name:'赛璐璐上色', x:390, y:1695, rank:'二代·入门', prereq:['S4'], content:'硬边分界 · 平涂', explain:'亮部和暗部之间没有过渡。先平涂，再叠暗部，最后加高光。', output:'干净的平涂' },
+  { id:'S6', b:'S', tier:2, name:'高光形状', x:390, y:1770, rank:'二代·进阶', prereq:['S5'], content:'点状/条状/环状高光', explain:'球体是点、圆柱是条、头发是环。', output:'高光有质感' },
+  { id:'S7', b:'S', tier:3, name:'材质区分', x:560, y:1620, rank:'三代·入门', prereq:['S6'], content:'金属布料皮肤头发', explain:'材质差异体现在反光强度和高光形状。', output:'材质一眼区分' },
+  { id:'S8', b:'S', tier:3, name:'边缘光反射', x:560, y:1695, rank:'三代·入门', prereq:['S7'], content:'轮廓光 · 逆光 · 辉光', explain:'逆光时轮廓亮、内部暗，极大提升完成度。', output:'角色与背景分离' },
+  { id:'S9', b:'S', tier:3, name:'氛围全局光', x:560, y:1770, rank:'三代·进阶', prereq:['S8'], content:'环境光 · 色彩统一', explain:'给整个画面罩一层环境色，共享同一光照环境。', output:'色彩统一' },
+  { id:'S10', b:'S', tier:3, name:'色彩情绪', x:730, y:1695, rank:'三代·精通', prereq:['S4','S9'], content:'色彩心理 · 情绪基调', explain:'暖色前进、冷色后退。配色本身就在讲故事。', output:'传递情绪' },
+
+  { id:'I1', b:'I', tier:3, name:'角色三视图', x:730, y:200, rank:'三代·入门', prereq:['H8','B5','L8'], content:'角色一致性 · 排版标注', explain:'交付标准是同一角色在不同角度下特征一致。', output:'可协作的设定稿' },
+  { id:'I2', b:'I', tier:3, name:'基础立绘', x:730, y:350, rank:'三代·进阶', prereq:['I1','S5'], content:'站姿构图 · 完整上色', explain:'立绘重点是角色本身，背景要简化但不能空。', output:'干净的立绘' },
+  { id:'I3', b:'I', tier:3, name:'半身插画', x:900, y:400, rank:'三代·进阶', prereq:['H12','B10','L9','S6'], content:'光影设计 · 材质表现', explain:'建立明确的视觉焦点，其他部分做减法。', output:'有光影设计的半身' },
+  { id:'I4', b:'I', tier:4, name:'全身插画', x:900, y:550, rank:'四代·入门', prereq:['I3','B11','L11','S7'], content:'动态构图 · 背景融合', explain:'先定动态线，再搭体块。用空气透视把角色推出来。', output:'动态完整的全身' },
+  { id:'I5', b:'I', tier:4, name:'故事性插画', x:900, y:750, rank:'四代·精通', prereq:['H14','G8','G10','L12','S9'], content:'镜头叙事 · 角色互动', explain:'靠角色互动、视线方向、环境线索来叙事。', output:'有故事的电影级插画' },
+  { id:'I6', b:'I', tier:4, name:'商单工业化', x:900, y:900, rank:'四代·宗师', prereq:['I2','I4','I5'], content:'标准化流程 · 风格提炼', explain:'把流程拆成草稿、线稿、上色、后期，每阶段设检查点。', output:'稳定工作流与风格' }
+];
+
+/* ═══════════ 状态与缓存逻辑 ═══════════ */
+const MAP = {}; NODES.forEach(n => MAP[n.id] = n);
+
+// 从缓存读取，如果没有则默认为空（未入门）
+let unlocked = new Set();
+const savedData = localStorage.getItem('illustration_tree_progress');
+if (savedData) {
+  try {
+    const arr = JSON.parse(savedData);
+    unlocked = new Set(arr);
+  } catch (e) { console.error('缓存解析失败'); }
+}
+
+let currentView = 'overall'; 
+let selectedId = null;
+let selectedBranch = 'T';
+
+function saveProgress() {
+  localStorage.setItem('illustration_tree_progress', JSON.stringify(Array.from(unlocked)));
+}
+
+function stateOf(n) {
+  if (unlocked.has(n.id)) return 'unlocked';
+  if (n.prereq.every(p => unlocked.has(p))) return 'available';
+  return 'locked';
+}
+
+function getOrthogonalPath(a, b) {
+  const ax = a.x + NW; const ay = a.y + NH/2;
+  const bx = b.x; const by = b.y + NH/2;
+  if (bx <= ax) {
+    const offsetX = a.x - 30; 
+    return `M ${ax} ${ay} L ${offsetX} ${ay} L ${offsetX} ${by} L ${bx} ${by}`;
+  }
+  const midX = ax + (bx - ax) / 2;
+  return `M ${ax} ${ay} L ${midX} ${ay} L ${midX} ${by} L ${bx} ${by}`;
+}
+
+function getBranchMaxRank(bCode) {
+  const bNodes = NODES.filter(n => n.b === bCode);
+  let maxTier = 0;
+  let total = bNodes.length;
+  let unlockedCount = 0;
+  bNodes.forEach(n => {
+    if (unlocked.has(n.id)) {
+      unlockedCount++;
+      if (n.tier > maxTier) maxTier = n.tier;
+    }
+  });
+  if (maxTier === 0) return '未入门';
+  if (unlockedCount === total) return TIER_LABEL[maxTier] + '·精通';
+  return TIER_LABEL[maxTier] + '·入门';
+}
+
+function getOverallRankIndex() {
+  let idx = 0;
+  for (let i = 0; i < RANKS.length; i++) {
+    if (RANKS[i].check()) {
+      idx = i;
+    } else {
+      break;
+    }
+  }
+  return idx;
+}
+
+function updateOverallUI() {
+  const idx = getOverallRankIndex();
+  const rank = RANKS[idx];
+  document.getElementById('headerRankText').textContent = rank.title;
+  const header = document.getElementById('headerRank');
+  header.style.borderColor = rank.color;
+  header.style.color = rank.color;
+  header.querySelector('.r-icon').textContent = rank.icon;
+  header.style.background = `rgba(${hexToRgb(rank.color)}, 0.1)`;
+}
+
+function hexToRgb(hex) {
+  let r = parseInt(hex.slice(1, 3), 16);
+  let g = parseInt(hex.slice(3, 5), 16);
+  let b = parseInt(hex.slice(5, 7), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
+/* ═══════════ UI 渲染 ═══════════ */
+const svg = document.getElementById('svg');
+const nodesLayer = document.getElementById('nodesLayer');
+const detailContent = document.getElementById('detailContent');
+const detailTitle = document.getElementById('detailTitle');
+const sidebar = document.getElementById('sidebar');
+
+Object.keys(BRANCHES).forEach(k => {
+  const el = document.createElement('div');
+  el.className = 'nav-item';
+  el.id = `nav-${k}`;
+  el.innerHTML = `<div class="nav-icon">${BRANCHES[k].icon}</div><div class="nav-name">${BRANCHES[k].name}</div>`;
+  el.onclick = () => {
+    const targetY = NODES.find(n => n.b === k).y;
+    document.getElementById('treeWrapper').scrollTo({ top: targetY - 100, behavior: 'smooth' });
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+    currentView = 'branch';
+    selectedBranch = k;
+    selectedId = null;
+    renderDetail();
+  };
+  sidebar.appendChild(el);
+});
+
+function render() {
+  svg.innerHTML = '';
+  NODES.forEach(n => {
+    n.prereq.forEach(pid => {
+      const a = MAP[pid];
+      if (!a) return;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', getOrthogonalPath(a, n));
+      path.setAttribute('class', unlocked.has(n.id) ? 'active' : (unlocked.has(a.id) ? 'open' : 'locked'));
+      svg.appendChild(path);
+    });
+  });
+
+  nodesLayer.innerHTML = '';
+  NODES.forEach(n => {
+    const el = document.createElement('div');
+    el.className = `node ${stateOf(n)}`;
+    el.style.left = n.x + 'px';
+    el.style.top = n.y + 'px';
+    if (currentView === 'node' && n.id === selectedId) el.classList.add('selected');
+    el.innerHTML = `
+      <div class="node-name">${n.name}</div>
+      <div class="node-rank">${n.rank}</div>
+    `;
+    el.onclick = () => { 
+      currentView = 'node'; 
+      selectedId = n.id; 
+      render(); 
+      renderDetail(); 
+      document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+      document.getElementById(`nav-${n.b}`).classList.add('active');
+    };
+    nodesLayer.appendChild(el);
+  });
+}
+
+function showOverall() {
+  currentView = 'overall';
+  selectedId = null;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  renderDetail();
+}
+
+function renderDetail() {
+  if (currentView === 'overall') {
+    const idx = getOverallRankIndex();
+    const r = RANKS[idx];
+    const nextR = RANKS[idx + 1];
+    detailTitle.textContent = '综合评定档案';
+    
+    let goalHtml = '';
+    if (nextR) {
+      goalHtml = `
+        <div class="next-goal-box ${nextR.isBeyond ? 'beyond' : ''}">
+          <div class="goal-title">${nextR.isBeyond ? '【超越科技树】' : '突破下一阶段：'}${nextR.title}</div>
+          <div class="goal-desc">${nextR.criteria}</div>
+        </div>
+      `;
+    } else {
+      goalHtml = `
+        <div class="next-goal-box" style="border-color:var(--warning); background:rgba(224,166,60,0.1)">
+          <div class="goal-title" style="color:var(--warning)">已达科技树顶点</div>
+          <div class="goal-desc">你已点亮全部科技树，成就六段宗师。七段与八段不依赖加点，而在画外。</div>
+        </div>
+      `;
+    }
+
+    const tagHtml = r.tag_ok.map(t => `<span class="o-tag">✓ ${t}</span>`).join('') + 
+                    r.tag_warn.map(t => `<span class="o-tag warn">! ${t}</span>`).join('');
+
+    detailContent.innerHTML = `
+      <div class="overall-panel">
+        <div class="overall-title">—— 当前综合评定 ——</div>
+        <div class="overall-rank" style="color:${r.color}">${r.title}</div>
+        <div class="overall-comment">${r.desc}</div>
+        <div class="overall-tags">${tagHtml}</div>
+      </div>
+      
+      ${goalHtml}
+
+      <div class="info-group">
+        <div class="info-label">审 美 提 示</div>
+        <div class="info-value explain-box" style="border-left-color:var(--warning)">
+          审美是提升一个二次元画手能力的重要指标。不要只死磕技法，多看好图、多阅片，知道什么是"好"的二次元表达，才能指导自己冲破瓶颈。
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="generateOverallCard()">生成个人评定报告</button>
+      <button class="btn btn-outline" onclick="generateTreeImage()">导出全景技术树</button>
+      
+      <div class="disclaimer-text">
+        ⚠️ 娱乐向测试：本结果由用户自行点亮节点得出，仅供娱乐参考，不构成任何专业美术评估。<br>
+        技术支持：DeepSeek
+      </div>
+    `;
+  } else if (currentView === 'branch') {
+    const b = BRANCHES[selectedBranch];
+    const bNodes = NODES.filter(n => n.b === selectedBranch);
+    const rank = getBranchMaxRank(selectedBranch);
+    const unlockedCount = bNodes.filter(n => unlocked.has(n.id)).length;
+    
+    detailTitle.textContent = `${b.name} · 总览`;
+    let listHtml = '';
+    bNodes.forEach(n => {
+      const st = stateOf(n);
+      const cls = st === 'unlocked' ? 'unlocked' : 'locked';
+      listHtml += `
+        <div class="b-item ${cls}" onclick="selectNode('${n.id}')">
+          <span class="b-item-name">${n.name}</span>
+          <span class="b-item-rank">${n.rank}</span>
+        </div>
+      `;
+    });
+
+    detailContent.innerHTML = `
+      <div class="info-group">
+        <div style="font-size:24px; margin-bottom:10px;">${b.icon}</div>
+        <h1 style="font-size:20px; color:#e6f3fc; font-weight:normal; margin-bottom:8px;">${b.name}</h1>
+        <div class="rank-badge ${unlockedCount>0?'unlocked':''}">${rank}</div>
+        <div class="info-value" style="font-size:12px; color:var(--dim);">已解锁进度: ${unlockedCount} / ${bNodes.length}</div>
+      </div>
+      
+      <div class="info-group">
+        <div class="info-label">分类包含技术</div>
+        <div class="b-list">${listHtml}</div>
+      </div>
+
+      <button class="btn btn-primary" onclick="generateBranchCard('${selectedBranch}')">生成 [${b.name}] 评定卡</button>
+      <button class="btn btn-outline" onclick="showOverall()">返回综合评定</button>
+    `;
+  } else {
+    const n = MAP[selectedId];
+    if (!n) return;
+    const st = stateOf(n);
+    const color = BRANCHES[n.b].color;
+    
+    detailTitle.textContent = '技术详情';
+    let btnHtml = '';
+    if (st === 'unlocked') {
+      btnHtml = `<button class="btn btn-primary" disabled>已 解 锁</button>`;
+    } else if (st === 'available') {
+      btnHtml = `<button class="btn btn-primary" onclick="unlockNode('${n.id}')">解 锁 本 节 点</button>`;
+    } else {
+      btnHtml = `<button class="btn btn-primary" disabled>需先解锁前置技术</button>`;
+    }
+
+    const prereqHtml = n.prereq.length ? n.prereq.map(p => `<span style="color:${unlocked.has(p)?'var(--success)':'#8b6a6a'}">${MAP[p].name}</span>`).join(' + ') : '无';
+
+    detailContent.innerHTML = `
+      <div class="info-group">
+        <div style="font-size:10px; color:${color}; letter-spacing:2px; margin-bottom:5px;">${BRANCHES[n.b].name} · ${n.rank.split('·')[0]}</div>
+        <h1 style="font-size:18px; color:#e6f3fc; font-weight:normal; margin-bottom:12px;">${n.name}</h1>
+        <div class="rank-badge ${st==='unlocked'?'unlocked':''}">${n.rank}</div>
+      </div>
+      <div class="info-group">
+        <div class="info-label">前置依赖</div>
+        <div class="info-value" style="font-size:12px;">${prereqHtml}</div>
+      </div>
+      <div class="info-group">
+        <div class="info-label">训练内容</div>
+        <div class="info-value">${n.content}</div>
+      </div>
+      <div class="info-group">
+        <div class="info-label">节点讲解</div>
+        <div class="info-value explain-box" style="border-left-color:${color}">${n.explain}</div>
+      </div>
+      <div class="info-group">
+        <div class="info-label">验收产出</div>
+        <div class="info-value" style="color:${color}">${n.output}</div>
+      </div>
+      ${btnHtml}
+      <button class="btn btn-outline" onclick="backToBranch('${n.b}')">返回 ${BRANCHES[n.b].name} 总览</button>
+    `;
+  }
+}
+
+function selectNode(id) {
+  currentView = 'node';
+  selectedId = id;
+  render();
+  renderDetail();
+}
+
+function backToBranch(bCode) {
+  currentView = 'branch';
+  selectedBranch = bCode;
+  render();
+  renderDetail();
+}
+
+// 解锁节点（包含确认提示）
+function unlockNode(id) {
+  if (stateOf(MAP[id]) === 'available') {
+    const n = MAP[id];
+    const confirmMsg = `【验收确认】\n\n你是否已经达到该节点的验收标准？\n\n目标产出：${n.output}\n\n(点击确定解锁，点击取消返回继续练习)`;
+    if (confirm(confirmMsg)) {
+      unlocked.add(id);
+      saveProgress(); // 存入缓存
+      render(); 
+      updateOverallUI();
+      renderDetail();
+    }
+  }
+}
+
+/* ═══════════ Canvas 工具 ═══════════ */
+function drawTechFrame(ctx, x, y, w, h, c=1, bg='#0a121a', border='#1a2c3a') {
+  const cut = 12 * c;
+  ctx.beginPath();
+  ctx.moveTo(x + cut, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - cut);
+  ctx.lineTo(x + w - cut, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + cut);
+  ctx.closePath();
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.strokeStyle = border; ctx.lineWidth = 1.5 * c; ctx.stroke();
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  let words = text.split('');
+  let line = '';
+  for(let n = 0; n < words.length; n++) {
+    let testLine = line + words[n];
+    let metrics = ctx.measureText(testLine);
+    let testWidth = metrics.width;
+    if (testWidth > maxWidth && n > 0) {
+      ctx.fillText(line, x, y);
+      line = words[n];
+      y += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line, x, y);
+  return y + lineHeight;
+}
+
+/* ═══════════ 生成分类评定卡 ═══════════ */
+function generateBranchCard(bCode) {
+  const b = BRANCHES[bCode];
+  const bNodes = NODES.filter(n => n.b === bCode);
+  const rank = getBranchMaxRank(bCode);
+  const unlockedCount = bNodes.filter(n => unlocked.has(n.id)).length;
+
+  const canvas = document.createElement('canvas');
+  
+  const cols = 2;
+  const rows = Math.ceil(bNodes.length / cols);
+  const W = 900, H = 380 + rows * 46 + 60; // 增加高度容纳免责声明
+  
+  canvas.width = W * 2; canvas.height = H * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  ctx.fillStyle = '#04070c'; ctx.fillRect(0, 0, W, H);
+  const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.7);
+  grad.addColorStop(0, 'rgba(20, 50, 80, 0.4)'); grad.addColorStop(1, 'rgba(4, 7, 12, 0)');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(40, 80, 120, 0.1)'; ctx.lineWidth = 1;
+  for(let i=0; i<W; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke(); }
+  for(let i=0; i<H; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke(); }
+
+  drawTechFrame(ctx, 30, 30, W - 60, H - 60, 1.5, '#0a121a', b.color);
+  ctx.fillStyle = b.color; ctx.fillRect(45, 30, 180, 4);
+
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = b.color; ctx.font = 'bold 18px "PingFang SC", sans-serif';
+  ctx.fillText(`${b.name}`, 50, 60);
+
+  ctx.fillStyle = '#dfeef8'; ctx.font = 'bold 32px "PingFang SC", sans-serif';
+  ctx.fillText('系统综合评定卡', 50, 90);
+
+  ctx.fillStyle = unlockedCount > 0 ? 'rgba(75, 224, 192, 0.15)' : 'rgba(224, 166, 60, 0.15)';
+  ctx.fillRect(50, 145, 200, 40);
+  ctx.strokeStyle = unlockedCount > 0 ? '#4be0c0' : '#e0a63c';
+  ctx.lineWidth = 1; ctx.strokeRect(50, 145, 200, 40);
+  ctx.fillStyle = unlockedCount > 0 ? '#4be0c0' : '#e0a63c';
+  ctx.font = 'bold 22px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(rank, 150, 165);
+
+  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(110, 175, 215, 0.8)'; ctx.font = '14px "PingFang SC", sans-serif';
+  ctx.fillText(`进度: ${unlockedCount} / ${bNodes.length} 节点`, W - 50, 80);
+
+  ctx.strokeStyle = '#1a2c3a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(50, 210); ctx.lineTo(W - 50, 210); ctx.stroke();
+
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const startY = 230;
+  const colW = (W - 100) / 2 - 10;
+
+  bNodes.forEach((n, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const nx = 50 + col * (colW + 20);
+    const ny = startY + row * 46;
+    const isUnlocked = unlocked.has(n.id);
+
+    drawTechFrame(ctx, nx, ny, colW, 36, 1, 'rgba(10, 18, 26, 0.6)', isUnlocked ? '#4be0c0' : '#1a2c3a');
+
+    ctx.fillStyle = isUnlocked ? '#eaf6ff' : '#5a7a8a';
+    ctx.font = 'bold 14px "PingFang SC", sans-serif';
+    ctx.fillText(n.name, nx + 15, ny + 18);
+
+    ctx.fillStyle = isUnlocked ? '#4be0c0' : '#4a6a7a';
+    ctx.font = '12px "PingFang SC", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(n.rank, nx + colW - 15, ny + 18);
+    ctx.textAlign = 'left';
+  });
+
+  // 页脚与免责声明
+  ctx.fillStyle = 'rgba(90, 140, 175, 0.4)'; ctx.font = '12px "PingFang SC", sans-serif';
+  ctx.fillText('CHARACTER ILLUSTRATION TECH TREE ·  技术支持 Deepseek', 50, H - 80);
+  
+  ctx.fillStyle = 'rgba(248, 113, 113, 0.6)'; ctx.font = '11px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('⚠️ 本评测结果由用户自行点亮生成，仅供娱乐参考，不代表任何专业机构评估结果，请理性看待。', W / 2, H - 55);
+
+  const now = new Date();
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(90, 140, 175, 0.4)';
+  ctx.fillText(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`, W - 50, H - 80);
+
+  const a = document.createElement('a');
+  a.download = `评定卡_${b.name}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+/* ═══════════ 生成个人综合评定报告卡 ═══════════ */
+function generateOverallCard() {
+  const idx = getOverallRankIndex();
+  const r = RANKS[idx];
+  const nextR = RANKS[idx + 1];
+  
+  const canvas = document.createElement('canvas');
+  const W = 900, H = 700; // 加高
+  canvas.width = W * 2; canvas.height = H * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  ctx.fillStyle = '#04070c'; ctx.fillRect(0, 0, W, H);
+  const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.7);
+  grad.addColorStop(0, 'rgba(30, 40, 60, 0.4)'); grad.addColorStop(1, 'rgba(4, 7, 12, 0)');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(40, 80, 120, 0.1)'; ctx.lineWidth = 1;
+  for(let i=0; i<W; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke(); }
+  for(let i=0; i<H; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke(); }
+
+  drawTechFrame(ctx, 30, 30, W - 60, H - 60, 1.5, '#0a121a', r.color);
+  ctx.fillStyle = r.color; ctx.fillRect(45, 30, 250, 4);
+
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = r.color; ctx.font = 'bold 18px "PingFang SC", sans-serif';
+  ctx.fillText('PERSONAL EVALUATION REPORT', 50, 60);
+
+  ctx.fillStyle = '#dfeef8'; ctx.font = 'bold 40px "PingFang SC", sans-serif';
+  ctx.fillText(r.title, 50, 90);
+
+  ctx.font = '60px "PingFang SC", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(r.icon, W - 50, 90);
+
+  // 评语
+  ctx.fillStyle = 'rgba(30, 60, 85, 0.2)';
+  ctx.fillRect(50, 170, W - 100, 160);
+  ctx.strokeStyle = r.color; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(50, 170); ctx.lineTo(50, 330); ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#b0c8d8'; ctx.font = '16px "PingFang SC", sans-serif';
+  wrapText(ctx, r.desc, 70, 190, W - 140, 26);
+
+  // 升段/隐藏条件
+  ctx.fillStyle = 'rgba(40, 80, 120, 0.15)';
+  ctx.fillRect(50, 350, W - 100, 80);
+  ctx.strokeStyle = nextR && nextR.isBeyond ? '#e0a63c' : '#2a5c8a'; 
+  ctx.setLineDash([5, 5]);
+  ctx.strokeRect(50, 350, W - 100, 80);
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = nextR && nextR.isBeyond ? '#e0a63c' : '#7cd8ff'; 
+  ctx.font = 'bold 14px "PingFang SC", sans-serif';
+  ctx.fillText(nextR ? `【${nextR.isBeyond ? '超越科技树' : '突破下一阶段'}：${nextR.title}】` : '【已达最高境界】', 70, 365);
+  ctx.fillStyle = '#a8c0d0'; ctx.font = '14px "PingFang SC", sans-serif';
+  wrapText(ctx, nextR ? nextR.criteria : '你已点亮全部科技树，成就六段宗师。七段与八段不依赖加点，而在画外。', 70, 390, W - 140, 20);
+
+  // 审美提示
+  ctx.fillStyle = '#e0a63c'; ctx.font = 'bold 16px "PingFang SC", sans-serif';
+  ctx.fillText('【审美提示】', 50, 460);
+  ctx.fillStyle = '#9fb9cb'; ctx.font = '15px "PingFang SC", sans-serif';
+  wrapText(ctx, '审美是提升一个二次元画手能力的重要指标。不要只死磕技法，多看好图、多阅片，知道什么是"好"的二次元表达，才能指导自己冲破瓶颈。', 50, 490, W - 100, 24);
+
+  // 页脚与免责声明
+  ctx.fillStyle = 'rgba(90, 140, 175, 0.4)'; ctx.font = '12px "PingFang SC", sans-serif';
+  ctx.fillText('技术支持：DeepSeek', 50, H - 80);
+  
+  ctx.fillStyle = 'rgba(248, 113, 113, 0.6)'; ctx.font = '11px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  wrapText(ctx, '⚠️ 免责声明：本测试结果完全由用户自行点亮节点决定，仅供娱乐参考，不做任何专业美术评估及责任担保。画技提升请以专业老师指导为准。', W / 2, H - 55, W - 100, 18);
+
+  const now = new Date();
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(90, 140, 175, 0.4)';
+  ctx.fillText(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`, W - 50, H - 80);
+
+  const a = document.createElement('a');
+  a.download = `综合评定报告_${r.title}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+/* ═══════════ 导出全景技术树 ═══════════ */
+function generateTreeImage() {
+  const btn = document.getElementById('exportBtn');
+  btn.textContent = '生成中...'; btn.disabled = true;
+
+  setTimeout(() => {
+    const PAD = 40, HEADER = 320, FOOTER = 120; // 加高头部和底部
+    const TREE_W = 1050, TREE_H = 1900;
+    const W = TREE_W + PAD * 2;
+    const H = HEADER + TREE_H + FOOTER + PAD;
+    const SCALE = 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W * SCALE; canvas.height = H * SCALE;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(SCALE, SCALE);
+
+    ctx.fillStyle = '#04070c'; ctx.fillRect(0, 0, W, H);
+    const g = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.7);
+    g.addColorStop(0, 'rgba(20, 50, 80, 0.3)'); g.addColorStop(1, 'rgba(4, 7, 12, 0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(40, 80, 120, 0.05)'; ctx.lineWidth = 1;
+    for(let i=0; i<W; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke(); }
+    for(let i=0; i<H; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke(); }
+
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#dfeef8'; ctx.font = 'bold 24px "PingFang SC", sans-serif';
+    ctx.fillText('二次元角色插画 · 科技树全景', PAD, 40);
+    
+    const idx = getOverallRankIndex();
+    const r = RANKS[idx];
+    ctx.fillStyle = r.color; ctx.font = 'bold 18px "PingFang SC", sans-serif';
+    ctx.fillText(`当前综合评定：${r.title}`, PAD, 75);
+    
+    ctx.fillStyle = '#5a7a8a'; ctx.font = '12px "PingFang SC", sans-serif';
+    ctx.fillText('技术支持：DeepSeek', PAD + 350, 100);
+
+    const startX = PAD, startY = 130;
+    const bKeys = Object.keys(BRANCHES);
+    const boxW = (W - PAD*2) / 7 - 10;
+    const boxH = 40;
+    
+    bKeys.forEach((k, i) => {
+      const bx = startX + i * (boxW + 10);
+      drawTechFrame(ctx, bx, startY, boxW, boxH, 1, 'rgba(10,18,26,0.8)', 'rgba(40,80,120,0.3)');
+      ctx.textAlign = 'center';
+      ctx.fillStyle = BRANCHES[k].color; ctx.font = 'bold 12px "PingFang SC", sans-serif';
+      ctx.fillText(`${BRANCHES[k].name}`, bx + boxW/2, startY + 14);
+      ctx.fillStyle = '#b0c8d8'; ctx.font = '12px "PingFang SC", sans-serif';
+      ctx.fillText(getBranchMaxRank(k), bx + boxW/2, startY + 30);
+    });
+
+    // 评语区
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillStyle = '#e0a63c'; ctx.font = '14px "PingFang SC", sans-serif';
+    ctx.fillText('【当前瓶颈提示】', PAD, 190);
+    ctx.fillStyle = '#b0c8d8'; ctx.font = '13px "PingFang SC", sans-serif';
+    wrapText(ctx, r.desc, PAD, 215, W - PAD*2, 20);
+
+    const TX = PAD - 20, TY = HEADER + 20;
+    
+    NODES.forEach(n => {
+      n.prereq.forEach(pid => {
+        const a = MAP[pid];
+        if (!a) return;
+        const ax = TX + a.x + NW; const ay = TY + a.y + NH/2;
+        const bx = TX + n.x; const by = TY + n.y + NH/2;
+        
+        ctx.beginPath();
+        if (bx <= ax) {
+          const offsetX = TX + a.x - 30;
+          ctx.moveTo(ax, ay); ctx.lineTo(offsetX, ay); ctx.lineTo(offsetX, by); ctx.lineTo(bx, by);
+        } else {
+          const midX = ax + (bx - ax) / 2;
+          ctx.moveTo(ax, ay); ctx.lineTo(midX, ay); ctx.lineTo(midX, by); ctx.lineTo(bx, by);
+        }
+        
+        if (unlocked.has(n.id)) { ctx.strokeStyle = '#4be0c0'; ctx.lineWidth = 2; ctx.setLineDash([]); }
+        else if (unlocked.has(a.id)) { ctx.strokeStyle = '#4a7a9a'; ctx.lineWidth = 2; ctx.setLineDash([4,4]); }
+        else { ctx.strokeStyle = '#1a2c3a'; ctx.lineWidth = 2; ctx.setLineDash([]); }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+    });
+
+    NODES.forEach(n => {
+      const nx = TX + n.x, ny = TY + n.y;
+      const st = stateOf(n);
+      
+      let bg = '#0d1822', border = '#1e3a4c';
+      if (st === 'unlocked') { bg = '#0f1e24'; border = '#4be0c0'; }
+      else if (st === 'available') { border = '#e0a63c'; }
+      else { ctx.globalAlpha = 0.4; }
+
+      drawTechFrame(ctx, nx, ny, NW, NH, 1.5, bg, border);
+      
+      ctx.fillStyle = border;
+      ctx.fillRect(nx + 12, ny, NW - 24, 2);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = st === 'unlocked' ? '#eaf6ff' : '#c0d8e8';
+      ctx.font = 'bold 12px "PingFang SC", sans-serif';
+      ctx.fillText(n.name, nx + NW/2, ny + 22);
+      
+      ctx.fillStyle = st === 'unlocked' ? '#4be0c0' : (st === 'available' ? '#e0a63c' : '#5a8a9a');
+      ctx.font = '11px "PingFang SC", sans-serif';
+      ctx.fillText(n.rank, nx + NW/2, ny + 42);
+
+      ctx.globalAlpha = 1.0;
+    });
+
+    // 底部信息与免责声明
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(90, 140, 175, 0.4)'; ctx.font = '14px "PingFang SC", sans-serif';
+    ctx.fillText('CHARACTER ILLUSTRATION TECH TREE', PAD, H - 80);
+    
+    const now = new Date();
+    ctx.textAlign = 'right';
+    ctx.fillText(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`, W - PAD, H - 80);
+    
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(248, 113, 113, 0.6)'; ctx.font = '12px "PingFang SC", sans-serif';
+    ctx.fillText('⚠️ 免责声明：本测试结果完全由用户自行点亮节点决定，仅供娱乐参考，不做任何专业美术评估及责任担保。', W / 2, H - 45);
+
+    const a = document.createElement('a');
+    a.download = `插画科技树_全景评级.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+
+    btn.textContent = '导出全景评级图'; btn.disabled = false;
+  }, 100);
+}
+
+document.getElementById('exportBtn').onclick = generateTreeImage;
+
+document.getElementById('resetBtn').onclick = () => {
+  if (confirm('确定要清空所有进度，重新开始吗？')) {
+    unlocked.clear();
+    saveProgress();
+    currentView = 'overall';
+    selectedBranch = 'T';
+    render(); 
+    updateOverallUI();
+    renderDetail();
+  }
+};
+
+// 初始化
+updateOverallUI();
+render();
+renderDetail();
+</script>
+</body>
+</html>
