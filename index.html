@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>二次元插画 · 段位评定</title>
 <style>
 :root {
@@ -62,7 +62,7 @@ body {
 .actions button.primary:hover { filter: brightness(1.2); }
 
 /* ═══ 主布局 ═══ */
-.main { display: flex; flex: 1; min-height: 0; }
+.main { display: flex; flex: 1; min-height: 0; position: relative; }
 
 /* 左侧导航 */
 .sidebar {
@@ -119,10 +119,11 @@ svg.links path.active { stroke: var(--success); filter: drop-shadow(0 0 4px rgba
 /* 右侧详情 */
 .detail {
   width: 340px; background: var(--panel); border-left: 1px solid var(--border);
-  display: flex; flex-direction: column; z-index: 5;
+  display: flex; flex-direction: column; z-index: 20;
 }
 .detail-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .detail-header h2 { font-size: 15px; color: #dfeef8; font-weight: normal; }
+.detail-close { display: none; cursor: pointer; font-size: 20px; color: #dfeef8; padding: 0 10px; }
 .detail-content { flex: 1; overflow-y: auto; padding: 20px; }
 .info-group { margin-bottom: 20px; }
 .info-label { font-size: 11px; color: #4a7a9a; letter-spacing: 1px; margin-bottom: 8px; border-bottom: 1px dashed #1a2c3a; padding-bottom: 4px; }
@@ -172,6 +173,51 @@ svg.links path.active { stroke: var(--success); filter: drop-shadow(0 0 4px rgba
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--panel); }
 ::-webkit-scrollbar-thumb { background: #1e3a4c; border-radius: 3px; }
+
+/* ═══════════ 移动端适配 (屏幕宽度小于 768px) ═══════════ */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column; height: auto; padding: 10px 15px; gap: 10px;
+  }
+  .header-left {
+    flex-direction: column; width: 100%; gap: 8px;
+  }
+  .header-title {
+    justify-content: center; text-align: center;
+  }
+  .header-title span { display: none; }
+  .author-info { justify-content: center; width: 100%; }
+  .actions {
+    display: flex; width: 100%; gap: 10px;
+  }
+  .actions button {
+    flex: 1; margin: 0;
+  }
+  .sidebar {
+    display: none; /* 移动端隐藏左侧导航 */
+  }
+  .tree-wrapper {
+    height: calc(100vh - 130px); /* 减去头部高度 */
+  }
+  .tree-container {
+    margin: 10px;
+  }
+  .detail {
+    position: fixed;
+    bottom: 0; left: 0; width: 100%; height: 60vh;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border-left: none; border-top: 1px solid var(--border);
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.8);
+    z-index: 100;
+  }
+  .detail.active {
+    transform: translateY(0);
+  }
+  .detail-close {
+    display: block; /* 显示关闭按钮 */
+  }
+}
 </style>
 </head>
 <body>
@@ -207,9 +253,10 @@ svg.links path.active { stroke: var(--success); filter: drop-shadow(0 0 4px rgba
     </div>
   </div>
 
-  <aside class="detail">
+  <aside class="detail" id="detailPanel">
     <div class="detail-header">
       <h2 id="detailTitle">综合评定档案</h2>
+      <div class="detail-close" onclick="closeDetail()">✕</div>
     </div>
     <div class="detail-content" id="detailContent"></div>
   </aside>
@@ -466,6 +513,7 @@ Object.keys(BRANCHES).forEach(k => {
     currentView = 'branch';
     selectedBranch = k;
     selectedId = null;
+    openDetail();
     renderDetail();
   };
   sidebar.appendChild(el);
@@ -499,18 +547,33 @@ function render() {
       currentView = 'node'; 
       selectedId = n.id; 
       render(); 
+      openDetail();
       renderDetail(); 
       document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-      document.getElementById(`nav-${n.b}`).classList.add('active');
+      const navEl = document.getElementById(`nav-${n.b}`);
+      if (navEl) navEl.classList.add('active');
     };
     nodesLayer.appendChild(el);
   });
+}
+
+// 打开详情面板（用于移动端滑出）
+function openDetail() {
+  if (window.innerWidth <= 768) {
+    document.getElementById('detailPanel').classList.add('active');
+  }
+}
+
+// 关闭详情面板（用于移动端）
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('active');
 }
 
 function showOverall() {
   currentView = 'overall';
   selectedId = null;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  openDetail();
   renderDetail();
 }
 
@@ -651,6 +714,7 @@ function selectNode(id) {
   currentView = 'node';
   selectedId = id;
   render();
+  openDetail();
   renderDetail();
 }
 
@@ -658,6 +722,7 @@ function backToBranch(bCode) {
   currentView = 'branch';
   selectedBranch = bCode;
   render();
+  openDetail();
   renderDetail();
 }
 
@@ -717,7 +782,7 @@ function generateBranchCard(bCode) {
   
   const cols = 2;
   const rows = Math.ceil(bNodes.length / cols);
-  const W = 900, H = 380 + rows * 46 + 60; // 增加高度容纳免责声明
+  const W = 900, H = 380 + rows * 46 + 60;
   
   canvas.width = W * 2; canvas.height = H * 2;
   const ctx = canvas.getContext('2d');
@@ -808,7 +873,7 @@ function generateOverallCard() {
   const nextR = RANKS[idx + 1];
   
   const canvas = document.createElement('canvas');
-  const W = 900, H = 700; // 加高
+  const W = 900, H = 700;
   canvas.width = W * 2; canvas.height = H * 2;
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
@@ -891,7 +956,7 @@ function generateTreeImage() {
   btn.textContent = '生成中...'; btn.disabled = true;
 
   setTimeout(() => {
-    const PAD = 40, HEADER = 320, FOOTER = 120; // 加高头部和底部
+    const PAD = 40, HEADER = 320, FOOTER = 120;
     const TREE_W = 1050, TREE_H = 1900;
     const W = TREE_W + PAD * 2;
     const H = HEADER + TREE_H + FOOTER + PAD;
@@ -1030,6 +1095,7 @@ document.getElementById('resetBtn').onclick = () => {
     render(); 
     updateOverallUI();
     renderDetail();
+    openDetail();
   }
 };
 
@@ -1037,6 +1103,7 @@ document.getElementById('resetBtn').onclick = () => {
 updateOverallUI();
 render();
 renderDetail();
+openDetail();
 </script>
 </body>
 </html>
